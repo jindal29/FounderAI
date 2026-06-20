@@ -1,0 +1,239 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum IdeaStatus {
+  DRAFT
+  ANALYZING
+  COMPLETED
+  FAILED
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+model User {
+  id                     String        @id
+  email                  String        @unique
+  name                   String?
+  imageUrl               String?
+  
+  // Stripe integration
+  stripeCustomerId       String?       @unique @map("stripe_customer_id")
+  stripeSubscriptionId   String?       @unique @map("stripe_subscription_id")
+  stripePriceId          String?       @map("stripe_price_id")
+  stripeCurrentPeriodEnd DateTime?     @map("stripe_current_period_end")
+  
+  createdAt              DateTime      @default(now()) @map("created_at")
+  updatedAt              DateTime      @updatedAt @map("updated_at")
+
+  ideas                  Idea[]
+  chatSessions           ChatSession[]
+  competitorReports      CompetitorReport[]
+  businessModelCanvases  BusinessModelCanvas[]
+  mvpRoadmaps            MvpRoadmap[]
+  pitchDecks             PitchDeck[]
+
+  @@index([email])
+  @@index([stripeCustomerId])
+  @@map("users")
+}
+
+model Idea {
+  id             String          @id @default(uuid())
+  userId         String          @map("user_id")
+  title          String
+  oneLiner       String          @map("one_liner")
+  description    String          @db.Text
+  industry       String
+  targetAudience String          @map("target_audience")
+  status         IdeaStatus      @default(DRAFT)
+  
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysisReport AnalysisReport?
+  businessPlan   BusinessPlan?
+  competitorReport CompetitorReport?
+  businessModelCanvas BusinessModelCanvas?
+  mvpRoadmap     MvpRoadmap?
+  pitchDeck      PitchDeck?
+
+  @@index([userId])
+  @@map("ideas")
+}
+
+model AnalysisReport {
+  id                 String   @id @default(uuid())
+  ideaId             String   @unique @map("idea_id")
+  marketScore        Int      @map("market_score")
+  
+  // JSON formats for complex, structured AI payloads
+  swotAnalysis       Json     @map("swot_analysis")
+  competitorAnalysis Json     @map("competitor_analysis")
+  targetPersona      Json     @map("target_persona")
+  marketSize         Json     @map("market_size")
+  risks              Json     @map("risks")
+  validationSteps    Json     @map("validation_steps")
+  
+  rawResponse        String?  @db.Text @map("raw_response")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  idea               Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@map("analysis_reports")
+}
+
+model BusinessPlan {
+  id                String   @id @default(uuid())
+  ideaId            String   @unique @map("idea_id")
+  
+  executiveSummary  String   @db.Text @map("executive_summary")
+  problemSolution   String   @db.Text @map("problem_solution")
+  monetizationModel String   @db.Text @map("monetization_model")
+  marketingStrategy String   @db.Text @map("marketing_strategy")
+  financialPlan     Json     @map("financial_plan")
+  milestones        Json     @map("milestones")
+  
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  idea              Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@map("business_plans")
+}
+
+model ChatSession {
+  id        String        @id @default(uuid())
+  userId    String        @map("user_id")
+  title     String
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@index([userId])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  sessionId String      @map("session_id")
+  role      ChatRole
+  content   String      @db.Text
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("chat_messages")
+}
+
+model CompetitorReport {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  ideaId         String?  @unique @map("idea_id")
+  
+  title          String
+  description    String   @db.Text
+  industry       String
+  
+  competitors    Json     @map("competitors")
+  
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idea           Idea?    @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("competitor_reports")
+}
+
+model BusinessModelCanvas {
+  id                    String   @id @default(uuid())
+  userId                String   @map("user_id")
+  ideaId                String?  @unique @map("idea_id")
+  
+  title                 String
+  description           String   @db.Text
+  
+  keyPartners          Json     @map("key_partners")
+  keyActivities        Json     @map("key_activities")
+  keyResources         Json     @map("key_resources")
+  valuePropositions    Json     @map("value_propositions")
+  customerRelationships Json     @map("customer_relationships")
+  channels             Json     @map("channels")
+  customerSegments     Json     @map("customer_segments")
+  costStructure        Json     @map("cost_structure")
+  revenueStreams       Json     @map("revenue_streams")
+  
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idea                  Idea?    @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("business_model_canvases")
+}
+
+model MvpRoadmap {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  ideaId         String?  @unique @map("idea_id")
+  
+  title          String
+  description    String   @db.Text
+  industry       String
+  
+  phases         Json     @map("phases")
+  techStack      Json     @map("tech_stack")
+  timeline       String   @map("timeline")
+  cost           String   @map("cost")
+  
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idea           Idea?    @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mvp_roadmaps")
+}
+
+model PitchDeck {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  ideaId         String?  @unique @map("idea_id")
+  
+  title          String
+  description    String   @db.Text
+  
+  slides         Json     @map("slides")
+  
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idea           Idea?    @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("pitch_decks")
+}
+
+
+
+
