@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
@@ -14,7 +15,8 @@ import {
   MessageSquare, 
   Settings,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  AlertOctagon
 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -24,6 +26,26 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const { user } = useUser();
+  const [dbError, setDbError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkDbHealth = async () => {
+      try {
+        const res = await fetch("/api/health");
+        if (!res.ok) {
+          const data = await res.json();
+          if (data.database && !data.database.connected) {
+            setDbError(data.database.error || "Database server is unreachable.");
+          }
+        } else {
+          setDbError(null);
+        }
+      } catch (err) {
+        console.error("Health check error:", err);
+      }
+    };
+    checkDbHealth();
+  }, [pathname]);
 
   const navItems = [
     {
@@ -154,7 +176,21 @@ export default function DashboardLayout({
         </header>
 
         {/* Dynamic page container */}
-        <main className="flex-1 p-6 md:p-8">
+        <main className="flex-1 p-6 md:p-8 space-y-6">
+          {dbError && (
+            <div className="rounded-xl border border-rose-500/20 bg-rose-950/10 p-4 flex items-start gap-3 text-xs text-rose-200">
+              <AlertOctagon className="w-5 h-5 text-rose-400 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-bold">Database Server Configuration Mismatch (P1001)</p>
+                <p className="text-slate-450 leading-relaxed pt-0.5">
+                  FounderAI cannot connect to the PostgreSQL instance. Verify your <code className="text-rose-300 bg-rose-950/30 px-1.5 py-0.5 rounded font-mono">DATABASE_URL</code> in your environment or check if your local PostgreSQL server is active on port 5432.
+                </p>
+                {dbError !== "Database server is unreachable." && (
+                  <p className="text-rose-400 font-mono text-[10px] pt-1">Error: {dbError}</p>
+                )}
+              </div>
+            </div>
+          )}
           {children}
         </main>
       </div>

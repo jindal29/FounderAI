@@ -22,3 +22,17 @@ if (process.env.NODE_ENV === "production") {
 }
 
 export const db = prisma;
+
+export async function checkDatabaseConnection(): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.DATABASE_URL) {
+    return { ok: false, error: "DATABASE_URL environment variable is missing" };
+  }
+  try {
+    // Quick query to check database availability
+    await db.$queryRaw`SELECT 1`;
+    return { ok: true };
+  } catch (err: any) {
+    console.error("Database connection check failed:", err);
+    return { ok: false, error: err.message || "Failed to connect to the database (P1001)" };
+  }
+}

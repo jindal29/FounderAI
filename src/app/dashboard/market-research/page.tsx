@@ -1,10 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { TrendingUp, Users, Target, ShieldAlert, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { TrendingUp, Users, Target, ShieldAlert, Sparkles, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+
+interface Idea {
+  id: string;
+  title: string;
+  industry: string;
+  description: string;
+}
 
 export default function MarketResearchPage() {
   // Calculator state
@@ -13,16 +30,88 @@ export default function MarketResearchPage() {
   const [serviceablePercent, setServiceablePercent] = useState(30);
   const [obtainablePercent, setObtainablePercent] = useState(5);
 
+  // Ideas & Scans State
+  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [selectedIdeaId, setSelectedIdeaId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [openDialog, setOpenDialog] = useState(false);
+
   // Static Math
   const tam = totalCustomers * annualValue;
   const sam = tam * (serviceablePercent / 100);
   const som = sam * (obtainablePercent / 100);
 
-  const trends = [
+  const [trends, setTrends] = useState([
     { trend: "SaaS Verticalization", impact: "High", detail: "Users demand niche, hyper-customized platforms instead of generic platforms like Salesforce." },
     { trend: "AI Agent Orchestration", impact: "Medium", detail: "Transitioning from conversational chatbots to autonomous workflows." },
     { trend: "Zero-Code Prototyping", impact: "High", detail: "Indie hackers launch MVPs within days using integrated component frameworks." }
-  ];
+  ]);
+
+  useEffect(() => {
+    const fetchIdeas = async () => {
+      try {
+        const res = await fetch("/api/ideas");
+        if (res.ok) {
+          const data = await res.json();
+          setIdeas(data.filter((i: any) => i.status === "COMPLETED" || i.status === "DRAFT"));
+        }
+      } catch (err) {
+        console.error("Failed to fetch ideas:", err);
+      }
+    };
+    fetchIdeas();
+  }, []);
+
+  const handleIdeaSelect = (ideaId: string) => {
+    setSelectedIdeaId(ideaId);
+    if (!ideaId) {
+      setSearchQuery("");
+      return;
+    }
+    const pickedIdea = ideas.find(i => i.id === ideaId);
+    if (pickedIdea) {
+      setSearchQuery(`Trends in ${pickedIdea.industry} for ${pickedIdea.title} (${pickedIdea.description.substring(0, 100)}...)`);
+    }
+  };
+
+  const handleScanTrends = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) {
+      alert("Please enter a trend search query or select an idea.");
+      return;
+    }
+
+    setScanning(true);
+    try {
+      const res = await fetch("/api/market-research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: searchQuery,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.trends && data.trends.length > 0) {
+          setTrends(data.trends);
+          setOpenDialog(false);
+        } else {
+          alert("No trends returned from scan.");
+        }
+      } else {
+        alert("Failed to scan trends. Please try again.");
+      }
+    } catch (err) {
+      console.error("Scanning error:", err);
+      alert("Internal error during trend scanning.");
+    } finally {
+      setScanning(false);
+      setSearchQuery("");
+      setSelectedIdeaId("");
+    }
+  };
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
@@ -32,10 +121,64 @@ export default function MarketResearchPage() {
           <h1 className="text-3xl font-bold font-outfit text-white">Market Research & Sizing</h1>
           <p className="text-slate-400 text-sm mt-1">Estimate market segments, identify industry trends, and size your TAM/SAM/SOM.</p>
         </div>
-        <button className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold bg-violet-600 hover:bg-violet-500 text-white transition-all shadow-lg shadow-violet-600/20 cursor-pointer">
-          <Sparkles className="w-4 h-4" />
-          <span>Scan Live Trends</span>
-        </button>
+        <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+          <DialogTrigger className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold bg-violet-600 hover:bg-violet-500 text-white transition-all shadow-lg shadow-violet-600/20 cursor-pointer">
+            <Sparkles className="w-4 h-4" />
+            <span>Scan Live Trends</span>
+          </DialogTrigger>
+          <DialogContent className="bg-slate-950 border border-slate-900 text-slate-100 max-w-lg p-6 rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-white font-outfit">Live Trend Scanner</DialogTitle>
+              <DialogDescription className="text-slate-400 text-xs">
+                Scan search engine indexes and verify market shifts. Select one of your concepts or input custom terms.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleScanTrends} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="existing-idea" className="text-xs text-slate-400">Select Existing Concept (Optional)</Label>
+                <select
+                  id="existing-idea"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:border-violet-600"
+                  value={selectedIdeaId}
+                  onChange={(e) => handleIdeaSelect(e.target.value)}
+                >
+                  <option value="">-- Custom trend scan --</option>
+                  {ideas.map((idea) => (
+                    <option key={idea.id} value={idea.id}>{idea.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="searchQuery" className="text-xs text-slate-400">Search Query / Industry Sector</Label>
+                <Input
+                  id="searchQuery"
+                  className="bg-slate-900 border-slate-800 focus:border-violet-600 text-xs text-white"
+                  placeholder="e.g., EdTech trends in 2026, AI productivity tools"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  required
+                />
+              </div>
+
+              <DialogFooter className="pt-4 flex justify-end gap-3">
+                <Button type="button" variant="ghost" onClick={() => setOpenDialog(false)} className="text-xs text-slate-400 hover:text-white cursor-pointer" disabled={scanning}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold cursor-pointer" disabled={scanning}>
+                  {scanning ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                      Scanning...
+                    </>
+                  ) : (
+                    "Run Trend Scan"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

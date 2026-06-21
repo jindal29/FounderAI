@@ -10,6 +10,16 @@ import {
   MvpRoadmapOutput,
   PitchDeckOutput
 } from "../openai";
+import {
+  getMockStructuredReport,
+  getMockBusinessPlan,
+  getMockStartupNames,
+  getMockBusinessSuggestions,
+  getMockCompetitorReport,
+  getMockBusinessModelCanvas,
+  getMockMvpRoadmap,
+  getMockPitchDeck
+} from "./mock-data";
 
 // Schema definitions using Gemini's OpenAPI-compliant Schema structures
 const analysisReportSchema: any = {
@@ -282,6 +292,11 @@ const pitchDeckSchema: any = {
 
 
 export class GeminiProvider implements AIProvider {
+  private isDummy(): boolean {
+    const key = process.env.GEMINI_API_KEY;
+    return !key || key.includes("dummy") || key.includes("AIzaSy...") || key === "";
+  }
+
   async generateStructuredReport(
     title: string,
     oneLiner: string,
@@ -289,6 +304,10 @@ export class GeminiProvider implements AIProvider {
     industry: string,
     targetAudience: string
   ): Promise<AnalysisReportOutput> {
+    if (this.isDummy()) {
+      return getMockStructuredReport(title, oneLiner, description, industry, targetAudience);
+    }
+
     const prompt = `
       You are an expert venture capitalist and experienced startup builder. 
       Analyze the following startup idea and generate a structured startup validation report conforming to the requested schema.
@@ -322,6 +341,10 @@ export class GeminiProvider implements AIProvider {
     industry: string,
     targetAudience: string
   ): Promise<BusinessPlanOutput> {
+    if (this.isDummy()) {
+      return getMockBusinessPlan(title, oneLiner, description, industry, targetAudience);
+    }
+
     const prompt = `
       You are an expert startup co-founder.
       Create a comprehensive business plan for the following startup concept conforming to the requested schema.
@@ -352,6 +375,10 @@ export class GeminiProvider implements AIProvider {
     description: string,
     industry: string
   ): Promise<StartupNamesOutput> {
+    if (this.isDummy()) {
+      return getMockStartupNames(description, industry);
+    }
+
     const prompt = `
       Generate 5 catchy, premium, modern startup name suggestions for a project in the ${industry} industry.
       Project Description: ${description}
@@ -377,6 +404,10 @@ export class GeminiProvider implements AIProvider {
     description: string,
     industry: string
   ): Promise<BusinessSuggestionsOutput> {
+    if (this.isDummy()) {
+      return getMockBusinessSuggestions(title, description, industry);
+    }
+
     const prompt = `
       Generate 3 tactical business suggestions or pivots for the following startup concept.
       
@@ -405,6 +436,10 @@ export class GeminiProvider implements AIProvider {
     description: string,
     industry: string
   ): Promise<CompetitorReportOutput> {
+    if (this.isDummy()) {
+      return getMockCompetitorReport(title, description, industry);
+    }
+
     const prompt = `
       You are an expert venture capitalist and startup strategist.
       Generate a detailed competitor analysis report for the following startup concept conforming to the requested schema.
@@ -434,6 +469,10 @@ export class GeminiProvider implements AIProvider {
     description: string,
     industry: string
   ): Promise<BusinessModelCanvasOutput> {
+    if (this.isDummy()) {
+      return getMockBusinessModelCanvas(title, description, industry);
+    }
+
     const prompt = `
       You are an expert startup co-founder and strategist.
       Generate a complete, professional Business Model Canvas (BMC) for the following startup concept conforming to the requested schema.
@@ -463,6 +502,10 @@ export class GeminiProvider implements AIProvider {
     description: string,
     industry: string
   ): Promise<MvpRoadmapOutput> {
+    if (this.isDummy()) {
+      return getMockMvpRoadmap(title, description, industry);
+    }
+
     const prompt = `
       You are an expert Chief Technology Officer and startup builder.
       Generate a detailed MVP development roadmap and technical specification for the following startup concept conforming to the requested schema.
@@ -494,6 +537,10 @@ export class GeminiProvider implements AIProvider {
     description: string,
     industry: string
   ): Promise<PitchDeckOutput> {
+    if (this.isDummy()) {
+      return getMockPitchDeck(title, description, industry);
+    }
+
     const prompt = `
       You are an expert venture capitalist and pitch advisor.
       Generate a 10-slide investor-ready pitch deck script and slide outlines for the following startup concept conforming to the requested schema.
